@@ -1,16 +1,20 @@
 const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 const API_KEY = process.env.COINGECKO_API_KEY;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this-in-production';
+
+// Supabase Configuration
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_KEY;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Rate limiting variables
 let lastApiCall = 0;
@@ -164,93 +168,67 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// Database setup
-const dbPath = path.join(__dirname, 'crypto_portfolio.db');
-const db = new sqlite3.Database(dbPath, (err) => {
-  if (err) {
-    console.error('Error opening database:', err.message);
-  } else {
-    console.log('Connected to SQLite database');
-    initializeDatabase();
-  }
-});
-
-// Initialize database tables
-function initializeDatabase() {
-  // Users table
-  db.run(`
-    CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      first_name TEXT NOT NULL,
-      last_name TEXT NOT NULL,
-      email TEXT UNIQUE NOT NULL,
-      password_hash TEXT NOT NULL,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-  `, (err) => {
-    if (err) {
-      console.error('Error creating users table:', err.message);
-    } else {
-      console.log('Users table ready');
-    }
-  });
-
-  // Check if holdings table exists and has user_id column
-  db.get("PRAGMA table_info(holdings)", (err, result) => {
-    if (err) {
-      console.error('Error checking holdings table:', err.message);
-      return;
-    }
+// Initialize Supabase connection
+async function initializeDatabase() {
+  try {
+    console.log('Connecting to Supabase...');
     
-    // If table doesn't exist, create it with user_id
-    if (!result) {
-      db.run(`
-        CREATE TABLE holdings (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          user_id INTEGER NOT NULL DEFAULT 1,
-          crypto_id TEXT NOT NULL,
-          symbol TEXT NOT NULL,
-          name TEXT NOT NULL,
-          amount REAL NOT NULL,
-          avg_price REAL NOT NULL,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (user_id) REFERENCES users (id)
-        )
-      `, (err) => {
-        if (err) {
-          console.error('Error creating holdings table:', err.message);
-        } else {
-          console.log('Holdings table created with user_id column');
-        }
-      });
+    // Test connection by checking if tables exist
+    const { data, error } = await supabase
+      .from('users')
+      .select('count', { count: 'exact', head: true });
+    
+    if (error && error.code === 'PGRST116') {
+      console.log('Tables do not exist yet. You need to create them in Supabase.');
+      console.log('Please run the SQL commands in your Supabase SQL editor:');
+      console.log(`
+-- Create users table
+CREATE TABLE IF NOT EXISTS users (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  first_name TEXT NOT NULL,
+  last_name TEXT NOT NULL,
+  email TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Create holdings table
+CREATE TABLE IF NOT EXISTS holdings (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  crypto_id TEXT NOT NULL,
+  symbol TEXT NOT NULL,
+  name TEXT NOT NULL,
+  amount DECIMAL NOT NULL,
+  avg_price DECIMAL NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Enable Row Level Security
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE holdings ENABLE ROW LEVEL SECURITY;
+
+-- Create policies
+CREATE POLICY "Users can view own data" ON users
+  FOR SELECT USING (auth.uid() = id);
+
+CREATE POLICY "Holdings are viewable by owner" ON holdings
+  FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Holdings are editable by owner" ON holdings
+  FOR ALL USING (auth.uid() = user_id);`);
     } else {
-      // Table exists, check if it has user_id column
-      db.all("PRAGMA table_info(holdings)", (err, columns) => {
-        if (err) {
-          console.error('Error checking holdings columns:', err.message);
-          return;
-        }
-        
-        const hasUserId = columns.some(col => col.name === 'user_id');
-        
-        if (!hasUserId) {
-          console.log('Adding user_id column to existing holdings table');
-          db.run('ALTER TABLE holdings ADD COLUMN user_id INTEGER NOT NULL DEFAULT 1', (err) => {
-            if (err) {
-              console.error('Error adding user_id column:', err.message);
-            } else {
-              console.log('Holdings table updated with user_id column');
-            }
-          });
-        } else {
-          console.log('Holdings table ready with user_id column');
-        }
-      });
+      console.log('Successfully connected to Supabase!');
     }
-  });
+  } catch (error) {
+    console.error('Error connecting to Supabase:', error);
+  }
 }
+
+// Initialize database on startup
+initializeDatabase();
 
 // Middleware to verify JWT token
 const authenticateToken = (req, res, next) => {
@@ -281,50 +259,59 @@ app.post('/api/auth/register', async (req, res) => {
   
   try {
     // Check if user already exists
-    db.get('SELECT * FROM users WHERE email = ?', [email], async (err, row) => {
-      if (err) {
-        console.error('Error checking existing user:', err.message);
-        return res.status(500).json({ error: 'Database error' });
+    const { data: existingUsers, error: checkError } = await supabase
+      .from('users')
+      .select('email')
+      .eq('email', email)
+      .limit(1);
+    
+    if (checkError) {
+      console.error('Error checking existing user:', checkError);
+      return res.status(500).json({ error: 'Database error' });
+    }
+    
+    if (existingUsers && existingUsers.length > 0) {
+      return res.status(400).json({ error: 'User already exists with this email' });
+    }
+    
+    // Hash password
+    const saltRounds = 10;
+    const passwordHash = await bcrypt.hash(password, saltRounds);
+    
+    // Insert new user
+    const { data: newUser, error: insertError } = await supabase
+      .from('users')
+      .insert({
+        first_name: firstName,
+        last_name: lastName,
+        email: email,
+        password_hash: passwordHash
+      })
+      .select()
+      .single();
+    
+    if (insertError) {
+      console.error('Error creating user:', insertError);
+      return res.status(500).json({ error: 'Failed to create user' });
+    }
+    
+    // Generate JWT token
+    const token = jwt.sign(
+      { userId: newUser.id, email: newUser.email },
+      JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+    
+    console.log(`New user registered: ${email}`);
+    res.json({
+      message: 'User created successfully',
+      token: token,
+      user: {
+        id: newUser.id,
+        firstName: newUser.first_name,
+        lastName: newUser.last_name,
+        email: newUser.email
       }
-      
-      if (row) {
-        return res.status(400).json({ error: 'User already exists with this email' });
-      }
-      
-      // Hash password
-      const saltRounds = 10;
-      const passwordHash = await bcrypt.hash(password, saltRounds);
-      
-      // Insert new user
-      db.run(
-        'INSERT INTO users (first_name, last_name, email, password_hash) VALUES (?, ?, ?, ?)',
-        [firstName, lastName, email, passwordHash],
-        function(err) {
-          if (err) {
-            console.error('Error creating user:', err.message);
-            return res.status(500).json({ error: 'Failed to create user' });
-          }
-          
-          // Generate JWT token
-          const token = jwt.sign(
-            { userId: this.lastID, email: email },
-            JWT_SECRET,
-            { expiresIn: '24h' }
-          );
-          
-          console.log(`New user registered: ${email}`);
-          res.json({
-            message: 'User created successfully',
-            token: token,
-            user: {
-              id: this.lastID,
-              firstName: firstName,
-              lastName: lastName,
-              email: email
-            }
-          });
-        }
-      );
     });
   } catch (error) {
     console.error('Registration error:', error);
@@ -333,7 +320,7 @@ app.post('/api/auth/register', async (req, res) => {
 });
 
 // Endpoint: User Login
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', async (req, res) => {
   console.log('POST /api/auth/login');
   const { email, password } = req.body;
   
@@ -341,74 +328,89 @@ app.post('/api/auth/login', (req, res) => {
     return res.status(400).json({ error: 'Email and password are required' });
   }
   
-  db.get('SELECT * FROM users WHERE email = ?', [email], async (err, user) => {
-    if (err) {
-      console.error('Error finding user:', err.message);
+  try {
+    // Find user by email
+    const { data: users, error: findError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('email', email)
+      .limit(1);
+    
+    if (findError) {
+      console.error('Error finding user:', findError);
       return res.status(500).json({ error: 'Database error' });
     }
     
-    if (!user) {
+    if (!users || users.length === 0) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
     
-    try {
-      // Compare password
-      const passwordMatch = await bcrypt.compare(password, user.password_hash);
-      
-      if (!passwordMatch) {
-        return res.status(401).json({ error: 'Invalid credentials' });
-      }
-      
-      // Generate JWT token
-      const token = jwt.sign(
-        { userId: user.id, email: user.email },
-        JWT_SECRET,
-        { expiresIn: '24h' }
-      );
-      
-      console.log(`User logged in: ${email}`);
-      res.json({
-        message: 'Login successful',
-        token: token,
-        user: {
-          id: user.id,
-          firstName: user.first_name,
-          lastName: user.last_name,
-          email: user.email
-        }
-      });
-    } catch (error) {
-      console.error('Login error:', error);
-      res.status(500).json({ error: 'Internal server error' });
+    const user = users[0];
+    
+    // Compare password
+    const passwordMatch = await bcrypt.compare(password, user.password_hash);
+    
+    if (!passwordMatch) {
+      return res.status(401).json({ error: 'Invalid credentials' });
     }
-  });
+    
+    // Generate JWT token
+    const token = jwt.sign(
+      { userId: user.id, email: user.email },
+      JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+    
+    console.log(`User logged in: ${email}`);
+    res.json({
+      message: 'Login successful',
+      token: token,
+      user: {
+        id: user.id,
+        firstName: user.first_name,
+        lastName: user.last_name,
+        email: user.email
+      }
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
-app.get('/api/portfolio', authenticateToken, (req, res) => {
+app.get('/api/portfolio', authenticateToken, async (req, res) => {
   console.log('GET /api/portfolio');
   const userId = req.user.userId;
   
-  db.all('SELECT * FROM holdings WHERE user_id = ? ORDER BY created_at ASC', [userId], (err, rows) => {
-    if (err) {
-      console.error('Error fetching portfolio:', err.message);
-      res.status(500).json({ error: 'Failed to fetch portfolio' });
-      return;
+  try {
+    const { data: holdings, error } = await supabase
+      .from('holdings')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: true });
+    
+    if (error) {
+      console.error('Error fetching portfolio:', error);
+      return res.status(500).json({ error: 'Failed to fetch portfolio' });
     }
     
-    const holdings = rows.map(row => ({
+    const formattedHoldings = holdings.map(row => ({
       id: row.crypto_id,
       symbol: row.symbol,
       name: row.name,
-      amount: row.amount,
-      avgPrice: row.avg_price,
+      amount: parseFloat(row.amount),
+      avgPrice: parseFloat(row.avg_price),
       currentPrice: 0 // Will be updated by frontend
     }));
     
-    res.json(holdings);
-  });
+    res.json(formattedHoldings);
+  } catch (error) {
+    console.error('Portfolio fetch error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 // Endpoint: Add new holding (protected)
-app.post('/api/portfolio', authenticateToken, (req, res) => {
+app.post('/api/portfolio', authenticateToken, async (req, res) => {
   console.log('POST /api/portfolio');
   const { crypto_id, symbol, name, amount, avgPrice } = req.body;
   const userId = req.user.userId;
@@ -417,83 +419,112 @@ app.post('/api/portfolio', authenticateToken, (req, res) => {
     return res.status(400).json({ error: 'Missing required fields' });
   }
   
-  // Check if holding already exists for this user
-  db.get('SELECT * FROM holdings WHERE crypto_id = ? AND user_id = ?', [crypto_id, userId], (err, row) => {
-    if (err) {
-      console.error('Error checking existing holding:', err.message);
+  try {
+    // Check if holding already exists for this user
+    const { data: existingHoldings, error: checkError } = await supabase
+      .from('holdings')
+      .select('*')
+      .eq('crypto_id', crypto_id)
+      .eq('user_id', userId)
+      .limit(1);
+    
+    if (checkError) {
+      console.error('Error checking existing holding:', checkError);
       return res.status(500).json({ error: 'Database error' });
     }
     
-    if (row) {
+    if (existingHoldings && existingHoldings.length > 0) {
       // Update existing holding (average the prices and sum amounts)
-      const newTotalAmount = row.amount + amount;
-      const newAvgPrice = ((row.amount * row.avg_price) + (amount * avgPrice)) / newTotalAmount;
+      const existing = existingHoldings[0];
+      const newTotalAmount = parseFloat(existing.amount) + parseFloat(amount);
+      const newAvgPrice = ((parseFloat(existing.amount) * parseFloat(existing.avg_price)) + (parseFloat(amount) * parseFloat(avgPrice))) / newTotalAmount;
       
-      db.run(
-        'UPDATE holdings SET amount = ?, avg_price = ?, updated_at = CURRENT_TIMESTAMP WHERE crypto_id = ? AND user_id = ?',
-        [newTotalAmount, newAvgPrice, crypto_id, userId],
-        function(err) {
-          if (err) {
-            console.error('Error updating holding:', err.message);
-            return res.status(500).json({ error: 'Failed to update holding' });
-          }
-          
-          console.log(`Updated holding for ${symbol}: ${newTotalAmount} at avg price ${newAvgPrice}`);
-          res.json({ 
-            message: 'Holding updated successfully',
-            id: crypto_id,
-            symbol,
-            name,
-            amount: newTotalAmount,
-            avgPrice: newAvgPrice
-          });
-        }
-      );
+      const { data: updatedHolding, error: updateError } = await supabase
+        .from('holdings')
+        .update({
+          amount: newTotalAmount,
+          avg_price: newAvgPrice,
+          updated_at: new Date().toISOString()
+        })
+        .eq('crypto_id', crypto_id)
+        .eq('user_id', userId)
+        .select()
+        .single();
+      
+      if (updateError) {
+        console.error('Error updating holding:', updateError);
+        return res.status(500).json({ error: 'Failed to update holding' });
+      }
+      
+      console.log(`Updated holding for ${symbol}: ${newTotalAmount} at avg price ${newAvgPrice}`);
+      res.json({
+        message: 'Holding updated successfully',
+        id: crypto_id,
+        symbol,
+        name,
+        amount: newTotalAmount,
+        avgPrice: newAvgPrice
+      });
     } else {
       // Insert new holding
-      db.run(
-        'INSERT INTO holdings (user_id, crypto_id, symbol, name, amount, avg_price) VALUES (?, ?, ?, ?, ?, ?)',
-        [userId, crypto_id, symbol, name, amount, avgPrice],
-        function(err) {
-          if (err) {
-            console.error('Error inserting holding:', err.message);
-            return res.status(500).json({ error: 'Failed to add holding' });
-          }
-          
-          console.log(`Added new holding: ${symbol} - ${amount} at ${avgPrice}`);
-          res.json({ 
-            message: 'Holding added successfully',
-            id: crypto_id,
-            symbol,
-            name,
-            amount,
-            avgPrice
-          });
-        }
-      );
+      const { data: newHolding, error: insertError } = await supabase
+        .from('holdings')
+        .insert({
+          user_id: userId,
+          crypto_id: crypto_id,
+          symbol: symbol,
+          name: name,
+          amount: parseFloat(amount),
+          avg_price: parseFloat(avgPrice)
+        })
+        .select()
+        .single();
+      
+      if (insertError) {
+        console.error('Error inserting holding:', insertError);
+        return res.status(500).json({ error: 'Failed to add holding' });
+      }
+      
+      console.log(`Added new holding: ${symbol} - ${amount} at ${avgPrice}`);
+      res.json({
+        message: 'Holding added successfully',
+        id: crypto_id,
+        symbol,
+        name,
+        amount: parseFloat(amount),
+        avgPrice: parseFloat(avgPrice)
+      });
     }
-  });
+  } catch (error) {
+    console.error('Portfolio add error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 // Endpoint: Delete holding (protected)
-app.delete('/api/portfolio/:crypto_id', authenticateToken, (req, res) => {
+app.delete('/api/portfolio/:crypto_id', authenticateToken, async (req, res) => {
   console.log('DELETE /api/portfolio/' + req.params.crypto_id);
   const { crypto_id } = req.params;
   const userId = req.user.userId;
   
-  db.run('DELETE FROM holdings WHERE crypto_id = ? AND user_id = ?', [crypto_id, userId], function(err) {
-    if (err) {
-      console.error('Error deleting holding:', err.message);
-      return res.status(500).json({ error: 'Failed to delete holding' });
-    }
+  try {
+    const { error } = await supabase
+      .from('holdings')
+      .delete()
+      .eq('crypto_id', crypto_id)
+      .eq('user_id', userId);
     
-    if (this.changes === 0) {
-      return res.status(404).json({ error: 'Holding not found' });
+    if (error) {
+      console.error('Error deleting holding:', error);
+      return res.status(500).json({ error: 'Failed to delete holding' });
     }
     
     console.log(`Deleted holding: ${crypto_id}`);
     res.json({ message: 'Holding deleted successfully' });
-  });
+  } catch (error) {
+    console.error('Delete holding error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 // Endpoint: lijst van top coins
