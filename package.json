@@ -1,4 +1,13 @@
 {
+  "name": "crypto-tracker",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "cd client && npm install && npm run build",
+    "start": "cd backend && node server.js",
+    "dev:client": "cd client && npm run dev",
+    "dev:backend": "cd backend && node server.js",
+    "install:all": "npm install && cd client && npm install && cd ../backend && npm install"
+  },
   "dependencies": {
     "@vercel/analytics": "^1.5.0",
     "bcrypt": "^6.0.0",
