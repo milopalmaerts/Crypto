@@ -6,6 +6,8 @@ import { TrendingUpIcon, TrendingDownIcon, ArrowUpIcon, ArrowDownIcon } from "lu
 import { cn } from "@/lib/utils";
 import { Link } from "react-router-dom";
 
+import { API_ENDPOINTS } from '../config/api';
+
 interface TopCoin {
   id: string;
   name: string;
@@ -34,7 +36,7 @@ const Home = () => {
   const fetchTopCoins = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:3001/api/coins');
+      const response = await fetch(API_ENDPOINTS.COINS);
       
       if (response.ok) {
         const data = await response.json();

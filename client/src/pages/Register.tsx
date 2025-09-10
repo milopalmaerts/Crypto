@@ -1,4 +1,5 @@
 import { useState } from "react";
+import React, { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Link, useNavigate } from "react-router-dom";
 import { UserPlusIcon, EyeIcon, EyeOffIcon, CheckIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { API_ENDPOINTS } from '../config/api';
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -63,7 +65,7 @@ const Register = () => {
 
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:3001/api/auth/register', {
+      const response = await fetch(API_ENDPOINTS.AUTH.REGISTER, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
