@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { RefreshCwIcon, TrendingUpIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
+import { API_ENDPOINTS } from '../config/api';
+import React, { useState, useEffect } from "react";
 
 const Portfolio = () => {
   const [holdings, setHoldings] = useState<CryptoHolding[]>([]);
@@ -41,7 +43,7 @@ const Portfolio = () => {
         return;
       }
 
-      const response = await fetch('http://localhost:3001/api/portfolio', {
+      const response = await fetch(API_ENDPOINTS.PORTFOLIO, {
         headers: getAuthHeaders()
       });
       
@@ -63,7 +65,7 @@ const Portfolio = () => {
         const updatedHoldings = await Promise.all(
           portfolioData.map(async (holding: CryptoHolding) => {
             try {
-              const priceResponse = await fetch(`http://localhost:3001/api/coin/${holding.id}`);
+              const priceResponse = await fetch(API_ENDPOINTS.COIN_DETAIL(holding.id));
               if (priceResponse.ok) {
                 const coinData = await priceResponse.json();
                 return {
@@ -120,7 +122,7 @@ const Portfolio = () => {
       }
 
       setLoading(true);
-      const response = await fetch('http://localhost:3001/api/portfolio', {
+      const response = await fetch(API_ENDPOINTS.PORTFOLIO, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({

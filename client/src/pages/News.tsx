@@ -3,6 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CalendarIcon, ExternalLinkIcon, TrendingUpIcon } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { API_ENDPOINTS } from '../config/api';
 
 interface NewsItem {
   id: string;
@@ -36,7 +38,7 @@ const News = () => {
   const fetchNews = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`http://localhost:3001/api/news?category=${selectedCategory}`);
+      const response = await fetch(`${API_ENDPOINTS.NEWS}?category=${selectedCategory}`);
       
       if (response.ok) {
         const data = await response.json();

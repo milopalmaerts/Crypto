@@ -5,6 +5,8 @@ import { AddCryptoModal } from "@/components/AddCryptoModal";
 import { Button } from "@/components/ui/button";
 import { RefreshCwIcon, TrendingUpIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import React, { useState, useEffect } from "react";
+import { API_ENDPOINTS } from '../config/api';
 
 const Portfolio = () => {
   const [holdings, setHoldings] = useState<CryptoHolding[]>([]);
@@ -15,7 +17,7 @@ const Portfolio = () => {
   // Fetch portfolio from database
   const fetchPortfolio = async () => {
     try {
-      const response = await fetch('http://localhost:3001/api/portfolio');
+      const response = await fetch(API_ENDPOINTS.PORTFOLIO);
       if (response.ok) {
         const portfolioData = await response.json();
         
@@ -23,7 +25,7 @@ const Portfolio = () => {
         const updatedHoldings = await Promise.all(
           portfolioData.map(async (holding: CryptoHolding) => {
             try {
-              const priceResponse = await fetch(`http://localhost:3001/api/coin/${holding.id}`);
+              const priceResponse = await fetch(API_ENDPOINTS.COIN_DETAIL(holding.id));
               if (priceResponse.ok) {
                 const coinData = await priceResponse.json();
                 return {
@@ -60,7 +62,7 @@ const Portfolio = () => {
   const addCrypto = async (newCrypto: Omit<CryptoHolding, "currentPrice">) => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:3001/api/portfolio', {
+      const response = await fetch(API_ENDPOINTS.PORTFOLIO, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

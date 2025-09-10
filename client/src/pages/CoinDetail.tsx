@@ -7,6 +7,8 @@ import { ArrowLeftIcon, ExpandIcon, ShrinkIcon, ArrowUpIcon, ArrowDownIcon, Tren
 import { Link } from "react-router-dom";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { cn } from "@/lib/utils";
+import React, { useState, useEffect } from "react";
+import { API_ENDPOINTS } from '../config/api';
 
 interface ChartDataPoint {
   timestamp: number;
@@ -65,7 +67,7 @@ const CoinDetail = () => {
     
     setChartLoading(true);
     try {
-      const chartRes = await fetch(`http://localhost:3001/api/coin/${id}/chart?days=${period}`);
+      const chartRes = await fetch(API_ENDPOINTS.COIN_CHART(id, period));
       
       if (chartRes.status === 429) {
         console.warn(`Rate limited by API (attempt ${retryCount + 1}), retrying...`);
@@ -106,7 +108,7 @@ const CoinDetail = () => {
     if (!id) return;
     
     try {
-      const coinRes = await fetch(`http://localhost:3001/api/coin/${id}`);
+      const coinRes = await fetch(API_ENDPOINTS.COIN_DETAIL(id));
       
       if (coinRes.status === 429) {
         console.warn(`Coin data rate limited (attempt ${retryCount + 1}), retrying...`);
