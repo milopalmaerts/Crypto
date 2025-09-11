@@ -1,14 +1,29 @@
-# Nixpacks Configuration for Railway
+# Nixpacks Configuration for Railway - Backend Only Deployment
 [variables]
 NODE_ENV = "production"
 
-[phases.install]
+# For monorepo: Tell Railway to build from the backend directory context
+[phases.setup]
 dependsOn = []
-cmds = ["cd backend && npm ci"]
+cmds = [
+  "echo 'Preparing backend deployment from monorepo'",
+  "echo 'Working directory: $(pwd)'",
+  "echo 'Listing files: $(ls -la)'"
+]
+
+[phases.install]
+dependsOn = ["setup"]
+# Install only production dependencies
+cmds = [
+  "npm ci --only=production --no-optional",
+  "echo 'Dependencies installed successfully'",
+  "echo 'Checking for express: $(npm list express || echo express not found)'"
+]
 
 [phases.build]
 dependsOn = ["install"]
 cmds = ["echo 'No build step required for backend'"]
 
+# Start the server directly
 [start]
-cmd = "cd backend && npm start"
+cmd = "node server.js"
