@@ -1,11 +1,10 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { PortfolioSummary } from "@/components/PortfolioSummary";
 import { CryptoCard, type CryptoHolding } from "@/components/CryptoCard";
 import { AddCryptoModal } from "@/components/AddCryptoModal";
 import { Button } from "@/components/ui/button";
 import { RefreshCwIcon, TrendingUpIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import React, { useState, useEffect } from "react";
 import { API_ENDPOINTS } from '../config/api';
 
 const Portfolio = () => {

@@ -5,45 +5,26 @@ import { Button } from "@/components/ui/button";
 import { TrendingUpIcon, TrendingDownIcon, ArrowUpIcon, ArrowDownIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Link } from "react-router-dom";
-
-import { API_ENDPOINTS } from '../config/api';
-
-interface TopCoin {
-  id: string;
-  name: string;
-  symbol: string;
-  current_price: number;
-  market_cap: number;
-  market_cap_rank?: number;
-  price_change_percentage_24h: number;
-  image: string;
-}
+import { useAuth } from "@/contexts/AuthContext";
+import { marketApi, type CoinMarketData } from "@/lib/marketApi";
 
 const Home = () => {
-  const [topCoins, setTopCoins] = useState<TopCoin[]>([]);
+  const [topCoins, setTopCoins] = useState<CoinMarketData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const { user } = useAuth();
+  const isAuthenticated = !!user;
 
   useEffect(() => {
-    // Check authentication status
-    const token = localStorage.getItem('auth_token');
-    setIsAuthenticated(!!token);
-    
     fetchTopCoins();
   }, []);
 
   const fetchTopCoins = async () => {
     try {
       setLoading(true);
-      const response = await fetch(API_ENDPOINTS.COINS);
-      
-      if (response.ok) {
-        const data = await response.json();
-        setTopCoins(data);
-      } else {
-        setError('Failed to fetch cryptocurrency data');
-      }
+      setError(null);
+      const data = await marketApi.getTopCoins(10);
+      setTopCoins(data);
     } catch (error) {
       console.error('Error fetching top coins:', error);
       setError('Unable to load cryptocurrency data');

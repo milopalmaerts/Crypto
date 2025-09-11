@@ -1,13 +1,11 @@
 import { useState } from "react";
-import React, { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Link, useNavigate } from "react-router-dom";
 import { LogInIcon, EyeIcon, EyeOffIcon } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { API_ENDPOINTS } from '../config/api';
+import { useAuth } from "@/contexts/AuthContext";
 
 const Login = () => {
   const [formData, setFormData] = useState({
@@ -15,61 +13,21 @@ const Login = () => {
     password: "",
   });
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const { toast } = useToast();
+  const { signIn, loading } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!formData.email || !formData.password) {
-      toast({
-        title: "Error",
-        description: "Please fill in all fields",
-        variant: "destructive",
-      });
       return;
     }
 
     try {
-      setLoading(true);
-      const response = await fetch(API_ENDPOINTS.AUTH.LOGIN, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        localStorage.setItem('auth_token', data.token);
-        localStorage.setItem('user_id', data.user.id);
-        localStorage.setItem('user_email', data.user.email);
-        
-        toast({
-          title: "Success",
-          description: "Successfully logged in!",
-        });
-        
-        navigate('/portfolio');
-      } else {
-        const error = await response.json();
-        toast({
-          title: "Login Failed",
-          description: error.message || "Invalid credentials",
-          variant: "destructive",
-        });
-      }
+      await signIn(formData.email, formData.password);
+      navigate('/portfolio');
     } catch (error) {
-      console.error('Login error:', error);
-      toast({
-        title: "Error",
-        description: "Unable to connect to server",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
+      // Error handling is done in the Auth context
     }
   };
 

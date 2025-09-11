@@ -1,5 +1,4 @@
 import { useState } from "react";
-import React, { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Link, useNavigate } from "react-router-dom";
 import { UserPlusIcon, EyeIcon, EyeOffIcon, CheckIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { API_ENDPOINTS } from '../config/api';
+import { useAuth } from "@/contexts/AuthContext";
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -19,7 +18,7 @@ const Register = () => {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const { signUp, loading } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -64,49 +63,10 @@ const Register = () => {
     }
 
     try {
-      setLoading(true);
-      const response = await fetch(API_ENDPOINTS.AUTH.REGISTER, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          email: formData.email,
-          password: formData.password,
-        }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        localStorage.setItem('auth_token', data.token);
-        localStorage.setItem('user_id', data.user.id);
-        localStorage.setItem('user_email', data.user.email);
-        
-        toast({
-          title: "Success",
-          description: "Account created successfully!",
-        });
-        
-        navigate('/portfolio');
-      } else {
-        const error = await response.json();
-        toast({
-          title: "Registration Failed",
-          description: error.message || "Failed to create account",
-          variant: "destructive",
-        });
-      }
+      await signUp(formData.email, formData.password, formData.firstName, formData.lastName);
+      navigate('/portfolio');
     } catch (error) {
-      console.error('Registration error:', error);
-      toast({
-        title: "Error",
-        description: "Unable to connect to server",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
+      // Error handling is done in the Auth context
     }
   };
 

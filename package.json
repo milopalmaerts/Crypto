@@ -9,8 +9,10 @@
     "install:all": "npm install && cd client && npm install && cd ../backend && npm install"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.57.4",
     "@vercel/analytics": "^1.5.0",
     "bcrypt": "^6.0.0",
+    "firebase-admin": "^13.5.0",
     "jsonwebtoken": "^9.0.2",
     "sqlite3": "^5.1.7"
   }

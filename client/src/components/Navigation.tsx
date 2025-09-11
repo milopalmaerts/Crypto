@@ -1,38 +1,24 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { TrendingUpIcon, HomeIcon, Newspaper, WalletIcon, LogOutIcon, UserIcon, MenuIcon, XIcon } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Navigation = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [userEmail, setUserEmail] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { toast } = useToast();
+  const { user, signOut } = useAuth();
+  const isAuthenticated = !!user;
 
-  useEffect(() => {
-    const token = localStorage.getItem('auth_token');
-    const email = localStorage.getItem('user_email');
-    setIsAuthenticated(!!token);
-    setUserEmail(email || "");
-  }, [location]);
-
-  const handleLogout = () => {
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('user_id');
-    localStorage.removeItem('user_email');
-    setIsAuthenticated(false);
-    setUserEmail("");
-    setMobileMenuOpen(false);
-    
-    toast({
-      title: "Logged out",
-      description: "You have been successfully logged out",
-    });
-    
-    navigate('/');
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      setMobileMenuOpen(false);
+      navigate('/');
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
   };
 
   const navigationItems = [
@@ -86,7 +72,7 @@ const Navigation = () => {
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2 text-sm">
                   <UserIcon className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-muted-foreground">{userEmail}</span>
+                  <span className="text-muted-foreground">{user?.email}</span>
                 </div>
                 <Button
                   variant="outline"
@@ -156,7 +142,7 @@ const Navigation = () => {
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
                     <UserIcon className="w-4 h-4" />
-                    {userEmail}
+                    {user?.email}
                   </div>
                   <Button
                     variant="outline"

@@ -7,36 +7,10 @@ import { ArrowLeftIcon, ExpandIcon, ShrinkIcon, ArrowUpIcon, ArrowDownIcon, Tren
 import { Link } from "react-router-dom";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { cn } from "@/lib/utils";
-import React, { useState, useEffect } from "react";
-import { API_ENDPOINTS } from '../config/api';
-
-interface ChartDataPoint {
-  timestamp: number;
-  price: number;
-  date: string;
-}
-
-interface ChartResponse {
-  data: ChartDataPoint[];
-  period: string;
-}
+import { marketApi, type CoinDetail, type ChartDataPoint, type ChartResponse } from "@/lib/marketApi";
 
 type TimePeriod = '1' | '7' | '30' | '365' | 'max';
 type ChartSize = 'small' | 'medium' | 'large' | 'xlarge';
-
-interface CoinDetail {
-  id: string;
-  name: string;
-  symbol: string;
-  market_data: {
-    current_price: { usd: number };
-    market_cap: { usd: number };
-    market_cap_rank: number;
-    price_change_percentage_24h: number;
-  };
-  description: { en: string };
-  image: { large: string };
-}
 
 const CoinDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -67,79 +41,27 @@ const CoinDetail = () => {
     
     setChartLoading(true);
     try {
-      const chartRes = await fetch(API_ENDPOINTS.COIN_CHART(id, period));
-      
-      if (chartRes.status === 429) {
-        console.warn(`Rate limited by API (attempt ${retryCount + 1}), retrying...`);
-        
-        // Faster retry with shorter delays (max 2 retries)
-        if (retryCount < 2) {
-          const delay = (retryCount + 1) * 1500; // 1.5s, 3s
-          console.log(`Retrying in ${delay}ms...`);
-          setTimeout(() => {
-            fetchChartData(period, retryCount + 1);
-          }, delay);
-          return;
-        } else {
-          console.log('Max retries reached, showing fallback message');
-          setChartData(null);
-          setChartLoading(false);
-          return;
-        }
-      }
-      
-      if (!chartRes.ok) {
-        throw new Error(`HTTP error! status: ${chartRes.status}`);
-      }
-      
-      const chart = await chartRes.json();
+      const chart = await marketApi.getChartData(id, period);
       setChartData(chart);
     } catch (error) {
       console.error('Error fetching chart data:', error);
       setChartData(null);
     } finally {
-      if (retryCount === 0) { // Only set loading to false on the initial call
-        setChartLoading(false);
-      }
+      setChartLoading(false);
     }
   };
 
-  const fetchCoinData = async (retryCount = 0) => {
+  const fetchCoinData = async () => {
     if (!id) return;
     
     try {
-      const coinRes = await fetch(API_ENDPOINTS.COIN_DETAIL(id));
-      
-      if (coinRes.status === 429) {
-        console.warn(`Coin data rate limited (attempt ${retryCount + 1}), retrying...`);
-        
-        // Faster retry with shorter delays (max 2 retries)
-        if (retryCount < 2) {
-          const delay = (retryCount + 1) * 2000; // 2s, 4s
-          console.log(`Retrying coin data in ${delay}ms...`);
-          setTimeout(() => {
-            fetchCoinData(retryCount + 1);
-          }, delay);
-          return;
-        } else {
-          console.log('Max coin data retries reached');
-          setLoading(false);
-          return;
-        }
-      }
-      
-      if (!coinRes.ok) {
-        throw new Error(`HTTP error! status: ${coinRes.status}`);
-      }
-      
-      const coinData = await coinRes.json();
+      const coinData = await marketApi.getCoinDetail(id);
       setCoin(coinData);
       
-      // Only fetch chart data after coin data is successfully loaded
-      // Add a small delay to respect rate limits
+      // Fetch chart data after coin data is successfully loaded
       setTimeout(() => {
         fetchChartData(selectedPeriod);
-      }, 1000);
+      }, 100);
       
     } catch (error) {
       console.error('Error fetching coin data:', error);
@@ -331,11 +253,11 @@ const CoinDetail = () => {
                       />
                       <Line 
                         type="monotone" 
-                        dataKey="price" 
-                        stroke="hsl(var(--primary))" 
+                        dataKey="price"
+                        stroke="hsl(var(--primary))"
                         strokeWidth={2}
                         dot={false}
-                        activeDot={{ r: 4, stroke: 'hsl(var(--primary))', strokeWidth: 2 }}
+                        activeDot={{ r: 6, fill: "hsl(var(--primary))" }}
                       />
                     </LineChart>
                   </ResponsiveContainer>
@@ -345,16 +267,24 @@ const CoinDetail = () => {
           </div>
         </div>
 
-        <div className="mt-8">
-          <Card className="bg-gradient-card border-border/50 shadow-card">
-            <CardHeader>
-              <CardTitle>About {coin.name}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div dangerouslySetInnerHTML={{ __html: coin.description?.en || 'No description available.' }} />
-            </CardContent>
-          </Card>
-        </div>
+        {coin.description?.en && (
+          <div className="mt-8">
+            <Card className="bg-gradient-card border-border/50 shadow-card">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUpIcon className="w-5 h-5" />
+                  About {coin.name}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div 
+                  className="prose prose-sm max-w-none dark:prose-invert text-muted-foreground"
+                  dangerouslySetInnerHTML={{ __html: coin.description.en }}
+                />
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -7,11 +7,15 @@ import { Link } from "react-router-dom";
 
 export interface CryptoHolding {
   id: string;
+  user_id: string;
+  crypto_id: string;
   symbol: string;
   name: string;
   amount: number;
-  avgPrice: number;
-  currentPrice: number;
+  avg_price: number;
+  currentPrice?: number; // Added at runtime for display
+  created_at: string;
+  updated_at: string;
   icon?: string;
 }
 
@@ -21,8 +25,9 @@ interface CryptoCardProps {
 }
 
 export const CryptoCard = ({ crypto, className }: CryptoCardProps) => {
-  const totalValue = crypto.amount * crypto.currentPrice;
-  const totalCost = crypto.amount * crypto.avgPrice;
+  const currentPrice = crypto.currentPrice || crypto.avg_price;
+  const totalValue = crypto.amount * currentPrice;
+  const totalCost = crypto.amount * crypto.avg_price;
   const profitLoss = totalValue - totalCost;
   const profitLossPercentage = ((profitLoss / totalCost) * 100);
   const isProfit = profitLoss >= 0;
@@ -31,7 +36,7 @@ export const CryptoCard = ({ crypto, className }: CryptoCardProps) => {
   // Chart data is only needed in the CoinDetail page, not in the card overview
 
   return (
-    <Link to={`/coin/${crypto.id}`}>
+    <Link to={`/coin/${crypto.crypto_id}`}>
       <Card className={cn("bg-gradient-card border-border/50 shadow-card hover:shadow-neon/20 transition-all duration-300 cursor-pointer", className)}>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
@@ -74,14 +79,14 @@ export const CryptoCard = ({ crypto, className }: CryptoCardProps) => {
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Avg Price</p>
-              <p className="text-sm font-medium text-foreground">${crypto.avgPrice.toFixed(2)}</p>
+              <p className="text-sm font-medium text-foreground">${crypto.avg_price.toFixed(2)}</p>
             </div>
           </div>
           
           <div className="space-y-2">
             <div className="flex justify-between items-center">
               <span className="text-sm text-muted-foreground">Current Price</span>
-              <span className="text-sm font-medium text-foreground">${crypto.currentPrice.toFixed(2)}</span>
+              <span className="text-sm font-medium text-foreground">${currentPrice.toFixed(2)}</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-muted-foreground">Total Value</span>

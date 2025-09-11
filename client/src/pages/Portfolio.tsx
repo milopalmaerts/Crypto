@@ -6,31 +6,24 @@ import { Button } from "@/components/ui/button";
 import { RefreshCwIcon, TrendingUpIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
-import { API_ENDPOINTS } from '../config/api';
-import React, { useState, useEffect } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { dbHelpers } from "@/lib/supabase";
+import { marketApi } from "@/lib/marketApi";
 
 const Portfolio = () => {
   const [holdings, setHoldings] = useState<CryptoHolding[]>([]);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const { user, session } = useAuth();
   const navigate = useNavigate();
-
-  // Helper function to get auth headers
-  const getAuthHeaders = () => {
-    const token = localStorage.getItem('auth_token');
-    return {
-      'Content-Type': 'application/json',
-      ...(token && { 'Authorization': `Bearer ${token}` })
-    };
-  };
 
   // Check if user is authenticated
   const isAuthenticated = () => {
-    return !!localStorage.getItem('auth_token');
+    return !!user && !!session;
   };
 
-  // Fetch portfolio from database
+  // Fetch portfolio from Supabase
   const fetchPortfolio = async () => {
     try {
       if (!isAuthenticated()) {
@@ -43,60 +36,39 @@ const Portfolio = () => {
         return;
       }
 
-      const response = await fetch(API_ENDPOINTS.PORTFOLIO, {
-        headers: getAuthHeaders()
-      });
-      
-      if (response.status === 401 || response.status === 403) {
-        localStorage.removeItem('auth_token');
-        toast({
-          title: "Session Expired",
-          description: "Please log in again",
-          variant: "destructive",
-        });
-        navigate('/login');
+      if (!user?.id) {
+        console.error('User ID not available');
         return;
       }
+
+      // Fetch holdings from Supabase
+      const portfolioData = await dbHelpers.holdings.getAll(user.id);
       
-      if (response.ok) {
-        const portfolioData = await response.json();
-        
-        // Fetch current prices for each holding
-        const updatedHoldings = await Promise.all(
-          portfolioData.map(async (holding: CryptoHolding) => {
-            try {
-              const priceResponse = await fetch(API_ENDPOINTS.COIN_DETAIL(holding.id));
-              if (priceResponse.ok) {
-                const coinData = await priceResponse.json();
-                return {
-                  ...holding,
-                  currentPrice: coinData.market_data?.current_price?.usd || holding.avgPrice
-                };
-              }
-            } catch (error) {
-              console.error(`Error fetching price for ${holding.symbol}:`, error);
-            }
+      // Fetch current prices for each holding
+      const updatedHoldings = await Promise.all(
+        portfolioData.map(async (holding) => {
+          try {
+            const coinData = await marketApi.getCoinDetail(holding.crypto_id);
             return {
               ...holding,
-              currentPrice: holding.avgPrice // Fallback to avg price
+              currentPrice: coinData.market_data?.current_price?.usd || holding.avg_price
             };
-          })
-        );
-        
-        setHoldings(updatedHoldings);
-      } else {
-        console.error('Failed to fetch portfolio');
-        toast({
-          title: "Error",
-          description: "Failed to fetch portfolio data",
-          variant: "destructive",
-        });
-      }
+          } catch (error) {
+            console.error(`Error fetching price for ${holding.symbol}:`, error);
+            return {
+              ...holding,
+              currentPrice: holding.avg_price // Fallback to avg price
+            };
+          }
+        })
+      );
+      
+      setHoldings(updatedHoldings);
     } catch (error) {
       console.error('Error fetching portfolio:', error);
       toast({
         title: "Error",
-        description: "Unable to connect to server",
+        description: "Failed to fetch portfolio data",
         variant: "destructive",
       });
     } finally {
@@ -121,44 +93,28 @@ const Portfolio = () => {
         return;
       }
 
-      setLoading(true);
-      const response = await fetch(API_ENDPOINTS.PORTFOLIO, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({
-          crypto_id: newCrypto.id,
-          symbol: newCrypto.symbol,
-          name: newCrypto.name,
-          amount: newCrypto.amount,
-          avgPrice: newCrypto.avgPrice,
-        }),
-      });
-
-      if (response.status === 401 || response.status === 403) {
-        localStorage.removeItem('auth_token');
-        toast({
-          title: "Session Expired",
-          description: "Please log in again",
-          variant: "destructive",
-        });
-        navigate('/login');
+      if (!user?.id) {
+        console.error('User ID not available');
         return;
       }
 
-      if (response.ok) {
-        await fetchPortfolio(); // Refresh the portfolio
-        toast({
-          title: "Success",
-          description: `${newCrypto.symbol} added to your portfolio`,
-        });
-      } else {
-        const error = await response.json();
-        toast({
-          title: "Error",
-          description: error.message || "Failed to add cryptocurrency",
-          variant: "destructive",
-        });
-      }
+      setLoading(true);
+      
+      // Add holding to Supabase
+      await dbHelpers.holdings.create({
+        user_id: user.id,
+        crypto_id: newCrypto.id,
+        symbol: newCrypto.symbol,
+        name: newCrypto.name,
+        amount: newCrypto.amount,
+        avg_price: newCrypto.avgPrice,
+      });
+
+      await fetchPortfolio(); // Refresh the portfolio
+      toast({
+        title: "Success",
+        description: `${newCrypto.symbol} added to your portfolio`,
+      });
     } catch (error) {
       console.error('Error adding crypto:', error);
       toast({

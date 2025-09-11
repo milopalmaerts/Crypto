@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { CryptoHolding } from "./CryptoCard";
 
 interface AddCryptoModalProps {
-  onAddCrypto: (crypto: Omit<CryptoHolding, "currentPrice">) => void;
+  onAddCrypto: (crypto: Omit<CryptoHolding, "id" | "user_id" | "currentPrice" | "created_at" | "updated_at">) => void;
 }
 
 const popularCryptos = [
@@ -57,11 +57,11 @@ export const AddCryptoModal = ({ onAddCrypto }: AddCryptoModalProps) => {
     }
 
     onAddCrypto({
-      id: formData.id || formData.symbol.toLowerCase(),
+      crypto_id: formData.id || formData.symbol.toLowerCase(),
       symbol: formData.symbol.toUpperCase(),
       name: formData.name,
       amount,
-      avgPrice,
+      avg_price: avgPrice,
     });
 
     setFormData({ id: "", symbol: "", name: "", amount: "", avgPrice: "" });
