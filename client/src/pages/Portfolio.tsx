@@ -8,7 +8,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { API_ENDPOINTS } from "@/config/api";
-import { marketApi } from "@/lib/marketApi";
+import { apiService } from '@/lib/apiService';
+import { type CoinDetail } from '@/lib/marketApi';
 
 const Portfolio = () => {
   const [holdings, setHoldings] = useState<CryptoHolding[]>([]);
@@ -64,15 +65,27 @@ const Portfolio = () => {
       const updatedHoldings = await Promise.all(
         portfolioData.map(async (holding: any) => {
           try {
-            const coinData = await marketApi.getCoinDetail(holding.id);
-            return {
-              id: holding.id,
-              symbol: holding.symbol,
-              name: holding.name,
-              amount: holding.amount,
-              avgPrice: holding.avgPrice,
-              currentPrice: coinData.market_data?.current_price?.usd || holding.avgPrice
-            };
+            const result = await apiService.getCoinDetail<CoinDetail>(holding.id);
+            if (result.data) {
+              return {
+                id: holding.id,
+                symbol: holding.symbol,
+                name: holding.name,
+                amount: holding.amount,
+                avgPrice: holding.avgPrice,
+                currentPrice: result.data.market_data?.current_price?.usd || holding.avgPrice
+              };
+            } else {
+              console.warn(`Failed to fetch price for ${holding.symbol}:`, result.error);
+              return {
+                id: holding.id,
+                symbol: holding.symbol,
+                name: holding.name,
+                amount: holding.amount,
+                avgPrice: holding.avgPrice,
+                currentPrice: holding.avgPrice // Fallback to avg price
+              };
+            }
           } catch (error) {
             console.error(`Error fetching price for ${holding.symbol}:`, error);
             return {

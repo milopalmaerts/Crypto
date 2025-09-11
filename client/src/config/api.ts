@@ -1,12 +1,23 @@
-// API configuration - Now using Supabase for auth/data and direct CoinGecko for market data
-// This file is maintained for backward compatibility during migration
+// API configuration - Firebase backend with environment-based URLs
+// Alternative endpoints for ERR_BLOCKED_BY_CLIENT resolution
 
-// Supabase configuration
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://fnggwmxkdgwxsbjekics.supabase.co';
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'your-anon-key-here';
+// Determine API base URL based on environment
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 
+                    (import.meta.env.PROD 
+                      ? 'https://cryptoportfolio-production.up.railway.app' // Production Railway URL
+                      : getLocalApiUrl());
 
-// Legacy API endpoints (deprecated - use Supabase client instead)
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
+// Function to get local API URL with fallback options
+function getLocalApiUrl() {
+  // Try multiple localhost alternatives for ERR_BLOCKED_BY_CLIENT issues
+  const alternatives = [
+    'http://127.0.0.1:3001',  // Numeric IP often bypasses ad blockers
+    'http://localhost:3001',   // Standard localhost
+  ];
+  
+  // In development, try 127.0.0.1 first as it often bypasses ad blockers
+  return alternatives[0];
+}
 
 export const API_ENDPOINTS = {
   BASE: API_BASE_URL,
@@ -19,12 +30,6 @@ export const API_ENDPOINTS = {
   COIN_DETAIL: (id: string) => `${API_BASE_URL}/api/coin/${id}`,
   COIN_CHART: (id: string, days: string) => `${API_BASE_URL}/api/coin/${id}/chart?days=${days}`,
   NEWS: `${API_BASE_URL}/api/news`,
-};
-
-// New Supabase configuration
-export const SUPABASE_CONFIG = {
-  URL: SUPABASE_URL,
-  ANON_KEY: SUPABASE_ANON_KEY
 };
 
 export default API_BASE_URL;

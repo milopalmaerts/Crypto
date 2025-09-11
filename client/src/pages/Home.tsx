@@ -6,7 +6,8 @@ import { TrendingUpIcon, TrendingDownIcon, ArrowUpIcon, ArrowDownIcon } from "lu
 import { cn } from "@/lib/utils";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { marketApi, type CoinMarketData } from "@/lib/marketApi";
+import { apiService } from '@/lib/apiService';
+import { type CoinMarketData } from "@/lib/marketApi";
 
 const Home = () => {
   const [topCoins, setTopCoins] = useState<CoinMarketData[]>([]);
@@ -23,8 +24,17 @@ const Home = () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await marketApi.getTopCoins(10);
-      setTopCoins(data);
+      const result = await apiService.getCoins<CoinMarketData[]>();
+      if (result.data) {
+        setTopCoins(result.data);
+        if (result.source === 'direct') {
+          console.log('Using direct CoinGecko API for coins data');
+        } else if (result.source === 'mock') {
+          console.warn('Using mock coins data - API unavailable');
+        }
+      } else {
+        setError(result.error || 'Unable to load cryptocurrency data');
+      }
     } catch (error) {
       console.error('Error fetching top coins:', error);
       setError('Unable to load cryptocurrency data');

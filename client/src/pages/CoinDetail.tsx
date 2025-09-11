@@ -7,7 +7,8 @@ import { ArrowLeftIcon, ExpandIcon, ShrinkIcon, ArrowUpIcon, ArrowDownIcon, Tren
 import { Link } from "react-router-dom";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { cn } from "@/lib/utils";
-import { marketApi, type CoinDetail, type ChartDataPoint, type ChartResponse } from "@/lib/marketApi";
+import { apiService } from '@/lib/apiService';
+import { type CoinDetail, type ChartResponse } from '@/lib/marketApi';
 
 type TimePeriod = '1' | '7' | '30' | '365' | 'max';
 type ChartSize = 'small' | 'medium' | 'large' | 'xlarge';
@@ -41,8 +42,18 @@ const CoinDetail = () => {
     
     setChartLoading(true);
     try {
-      const chart = await marketApi.getChartData(id, period);
-      setChartData(chart);
+      const result = await apiService.getChartData<ChartResponse>(id, period);
+      if (result.data) {
+        setChartData(result.data);
+        if (result.source === 'direct') {
+          console.log('Using direct CoinGecko API for chart data');
+        } else if (result.source === 'mock') {
+          console.warn('Using mock chart data - API unavailable');
+        }
+      } else {
+        console.error('Failed to fetch chart data:', result.error);
+        setChartData(null);
+      }
     } catch (error) {
       console.error('Error fetching chart data:', error);
       setChartData(null);
@@ -55,14 +66,22 @@ const CoinDetail = () => {
     if (!id) return;
     
     try {
-      const coinData = await marketApi.getCoinDetail(id);
-      setCoin(coinData);
-      
-      // Fetch chart data after coin data is successfully loaded
-      setTimeout(() => {
-        fetchChartData(selectedPeriod);
-      }, 100);
-      
+      const result = await apiService.getCoinDetail<CoinDetail>(id);
+      if (result.data) {
+        setCoin(result.data);
+        if (result.source === 'direct') {
+          console.log('Using direct CoinGecko API for coin data');
+        } else if (result.source === 'mock') {
+          console.warn('Using mock coin data - API unavailable');
+        }
+        
+        // Fetch chart data after coin data is successfully loaded
+        setTimeout(() => {
+          fetchChartData(selectedPeriod);
+        }, 100);
+      } else {
+        console.error('Failed to fetch coin data:', result.error);
+      }
     } catch (error) {
       console.error('Error fetching coin data:', error);
     } finally {

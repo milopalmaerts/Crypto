@@ -1,0 +1,14 @@
+# Nixpacks Configuration for Railway
+[variables]
+NODE_ENV = "production"
+
+[phases.install]
+dependsOn = []
+cmds = ["cd backend && npm ci"]
+
+[phases.build]
+dependsOn = ["install"]
+cmds = ["echo 'No build step required for backend'"]
+
+[start]
+cmd = "cd backend && npm start"

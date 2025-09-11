@@ -15,9 +15,27 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this-in-pro
 
 // Rate limiting variables
 let consecutiveFailures = 0;
-const MAX_CONSECUTIVE_FAILURES = 3;
+const MAX_CONSECUTIVE_FAILURES = 2; // Reduced from 3 to 2
 const queue = [];
 let isProcessing = false;
+
+// Cache for API responses
+const cache = new Map();
+const CACHE_DURATION = 30000; // 30 seconds
+
+// Helper function to get cached data
+const getCachedData = (key) => {
+  const cached = cache.get(key);
+  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+    return cached.data;
+  }
+  return null;
+};
+
+// Helper function to set cached data
+const setCachedData = (key, data) => {
+  cache.set(key, { data, timestamp: Date.now() });
+};
 
 // Queue for API calls to prevent rate limiting
 const queueApiCall = async (apiCall) => {
@@ -121,16 +139,40 @@ if (serviceAccount) {
 
 const db = admin.firestore();
 
-// Enhanced CORS configuration for development
+// Enhanced CORS configuration for development and production
 const corsOptions = {
-  origin: [
-    'http://localhost:8082',
-    'http://localhost:3000',
-    'http://127.0.0.1:8082',
-    'http://127.0.0.1:3000',
-    'http://localhost:5173', // Vite default
-    'http://127.0.0.1:5173'
-  ],
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, Postman, etc.)
+    if (!origin) return callback(null, true);
+    
+    const allowedOrigins = [
+      'http://localhost:8082',
+      'http://localhost:8083', // Current dev server
+      'http://localhost:3000',
+      'http://127.0.0.1:8082',
+      'http://127.0.0.1:8083',
+      'http://127.0.0.1:3000',
+      'http://localhost:5173', // Vite default
+      'http://127.0.0.1:5173',
+      'https://cryptoportfolio-psi.vercel.app' // Production frontend
+    ];
+    
+    // Allow Railway domains
+    if (origin.includes('.railway.app')) {
+      return callback(null, true);
+    }
+    
+    // Allow Vercel domains
+    if (origin.includes('.vercel.app')) {
+      return callback(null, true);
+    }
+    
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    
+    callback(new Error('Not allowed by CORS'));
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -155,17 +197,23 @@ app.get('/health', (req, res) => {
 
 // JWT authentication middleware
 const authenticateToken = (req, res, next) => {
+  console.log('Auth middleware called for:', req.method, req.path);
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
+  console.log('Token received:', token ? 'Yes' : 'No');
+  console.log('JWT_SECRET being used:', JWT_SECRET);
 
   if (!token) {
+    console.log('No token provided');
     return res.status(401).json({ error: 'Access token required' });
   }
 
   jwt.verify(token, JWT_SECRET, (err, user) => {
     if (err) {
+      console.log('JWT verification error:', err.message);
       return res.status(403).json({ error: 'Invalid or expired token' });
     }
+    console.log('JWT verified successfully for user:', user.userId);
     req.user = user;
     next();
   });
@@ -196,7 +244,7 @@ const createUser = async (firstName, lastName, email, passwordHash) => {
 
 // Helper: get holdings by user
 const getHoldingsByUser = async (userId) => {
-  const snapshot = await db.collection('holdings').where('user_id', '==', userId).orderBy('created_at', 'asc').get();
+  const snapshot = await db.collection('holdings').where('user_id', '==', userId).get();
   return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 };
 
@@ -405,6 +453,16 @@ app.delete('/api/portfolio/:crypto_id', authenticateToken, async (req, res) => {
 
 app.get('/api/coins', async (req, res) => {
   try {
+    console.log('Checking cache for coins data');
+    
+    // Check cache first
+    const cacheKey = 'coins';
+    const cachedData = getCachedData(cacheKey);
+    if (cachedData) {
+      console.log('Returning cached coins data');
+      return res.json(cachedData);
+    }
+    
     console.log('Queueing coins request from CoinGecko');
     
     const result = await queueApiCall(async () => {
@@ -422,7 +480,7 @@ app.get('/api/coins', async (req, res) => {
       }
       
       const response = await axios.get(apiUrl, { headers });
-      return response.data.map(coin => ({
+      const coinsData = response.data.map(coin => ({
         id: coin.id,
         name: coin.name,
         symbol: coin.symbol.toUpperCase(),
@@ -431,6 +489,10 @@ app.get('/api/coins', async (req, res) => {
         price_change_percentage_24h: coin.price_change_percentage_24h,
         image: coin.image
       }));
+      
+      // Cache the successful response
+      setCachedData(cacheKey, coinsData);
+      return coinsData;
     });
     
     res.json(result);
@@ -476,6 +538,16 @@ app.get('/api/coin/:id/chart', async (req, res) => {
   const validDays = timeMap[days] || '7';
   
   try {
+    console.log('Checking cache for chart data:', id, 'period:', validDays);
+    
+    // Check cache first
+    const cacheKey = `chart-${id}-${validDays}`;
+    const cachedData = getCachedData(cacheKey);
+    if (cachedData) {
+      console.log('Returning cached chart data for', id, 'period:', validDays);
+      return res.json(cachedData);
+    }
+    
     console.log('Queueing chart request for', id, 'with period', validDays);
     
     const result = await queueApiCall(async () => {
@@ -501,7 +573,11 @@ app.get('/api/coin/:id/chart', async (req, res) => {
         date: new Date(timestamp).toLocaleDateString()
       }));
       
-      return { data: chartData, period: validDays };
+      const result = { data: chartData, period: validDays };
+      
+      // Cache the successful response
+      setCachedData(cacheKey, result);
+      return result;
     });
     
     res.json(result);
@@ -572,6 +648,16 @@ app.get('/api/news', (req, res) => {
 app.get('/api/coin/:id', async (req, res) => {
   const { id } = req.params;
   try {
+    console.log('Checking cache for coin details:', id);
+    
+    // Check cache first
+    const cacheKey = `coin-${id}`;
+    const cachedData = getCachedData(cacheKey);
+    if (cachedData) {
+      console.log('Returning cached coin data for', id);
+      return res.json(cachedData);
+    }
+    
     console.log('Queueing coin details request for', id);
     
     const result = await queueApiCall(async () => {
@@ -585,6 +671,9 @@ app.get('/api/coin/:id', async (req, res) => {
       }
       
       const response = await axios.get(apiUrl, { headers });
+      
+      // Cache the successful response
+      setCachedData(cacheKey, response.data);
       return response.data;
     });
     
