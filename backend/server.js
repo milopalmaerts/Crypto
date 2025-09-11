@@ -121,8 +121,37 @@ if (serviceAccount) {
 
 const db = admin.firestore();
 
-app.use(cors());
+// Enhanced CORS configuration for development
+const corsOptions = {
+  origin: [
+    'http://localhost:8082',
+    'http://localhost:3000',
+    'http://127.0.0.1:8082',
+    'http://127.0.0.1:3000',
+    'http://localhost:5173', // Vite default
+    'http://127.0.0.1:5173'
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+};
+
+app.use(cors(corsOptions));
 app.use(express.json());
+
+// Add explicit preflight handling
+app.options('*', cors(corsOptions));
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'OK', 
+    timestamp: new Date().toISOString(),
+    service: 'EindRersult Backend',
+    firebase: 'Connected',
+    cors: 'Enabled'
+  });
+});
 
 // JWT authentication middleware
 const authenticateToken = (req, res, next) => {

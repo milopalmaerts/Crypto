@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect } from 'react';
 import { PortfolioSummary } from "@/components/PortfolioSummary";
 import { CryptoCard, type CryptoHolding } from "@/components/CryptoCard";
 import { AddCryptoModal } from "@/components/AddCryptoModal";
@@ -7,7 +7,7 @@ import { RefreshCwIcon, TrendingUpIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { dbHelpers } from "@/lib/supabase";
+import { API_ENDPOINTS } from "@/config/api";
 import { marketApi } from "@/lib/marketApi";
 
 const Portfolio = () => {
@@ -15,15 +15,10 @@ const Portfolio = () => {
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
-  const { user, session } = useAuth();
+  const { user, token, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
-  // Check if user is authenticated
-  const isAuthenticated = () => {
-    return !!user && !!session;
-  };
-
-  // Fetch portfolio from Supabase
+  // Fetch portfolio from Firebase backend
   const fetchPortfolio = async () => {
     try {
       if (!isAuthenticated()) {
@@ -36,28 +31,57 @@ const Portfolio = () => {
         return;
       }
 
-      if (!user?.id) {
-        console.error('User ID not available');
+      if (!token) {
+        console.error('Auth token not available');
         return;
       }
 
-      // Fetch holdings from Supabase
-      const portfolioData = await dbHelpers.holdings.getAll(user.id);
+      // Fetch holdings from Firebase backend
+      const response = await fetch(API_ENDPOINTS.PORTFOLIO, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          toast({
+            title: "Session Expired",
+            description: "Please log in again",
+            variant: "destructive",
+          });
+          navigate('/login');
+          return;
+        }
+        throw new Error('Failed to fetch portfolio');
+      }
+
+      const portfolioData = await response.json();
       
       // Fetch current prices for each holding
       const updatedHoldings = await Promise.all(
-        portfolioData.map(async (holding) => {
+        portfolioData.map(async (holding: any) => {
           try {
-            const coinData = await marketApi.getCoinDetail(holding.crypto_id);
+            const coinData = await marketApi.getCoinDetail(holding.id);
             return {
-              ...holding,
-              currentPrice: coinData.market_data?.current_price?.usd || holding.avg_price
+              id: holding.id,
+              symbol: holding.symbol,
+              name: holding.name,
+              amount: holding.amount,
+              avgPrice: holding.avgPrice,
+              currentPrice: coinData.market_data?.current_price?.usd || holding.avgPrice
             };
           } catch (error) {
             console.error(`Error fetching price for ${holding.symbol}:`, error);
             return {
-              ...holding,
-              currentPrice: holding.avg_price // Fallback to avg price
+              id: holding.id,
+              symbol: holding.symbol,
+              name: holding.name,
+              amount: holding.amount,
+              avgPrice: holding.avgPrice,
+              currentPrice: holding.avgPrice // Fallback to avg price
             };
           }
         })
@@ -65,7 +89,7 @@ const Portfolio = () => {
       
       setHoldings(updatedHoldings);
     } catch (error) {
-      console.error('Error fetching portfolio:', error);
+      console.error('Failed to fetch portfolio:', error);
       toast({
         title: "Error",
         description: "Failed to fetch portfolio data",
@@ -93,22 +117,41 @@ const Portfolio = () => {
         return;
       }
 
-      if (!user?.id) {
-        console.error('User ID not available');
+      if (!token) {
+        console.error('Auth token not available');
         return;
       }
 
       setLoading(true);
       
-      // Add holding to Supabase
-      await dbHelpers.holdings.create({
-        user_id: user.id,
-        crypto_id: newCrypto.id,
-        symbol: newCrypto.symbol,
-        name: newCrypto.name,
-        amount: newCrypto.amount,
-        avg_price: newCrypto.avgPrice,
+      // Add holding to Firebase backend
+      const response = await fetch(API_ENDPOINTS.PORTFOLIO, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          crypto_id: newCrypto.id,
+          symbol: newCrypto.symbol,
+          name: newCrypto.name,
+          amount: newCrypto.amount,
+          avgPrice: newCrypto.avgPrice,
+        }),
       });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          toast({
+            title: "Session Expired",
+            description: "Please log in again",
+            variant: "destructive",
+          });
+          navigate('/login');
+          return;
+        }
+        throw new Error('Failed to add cryptocurrency');
+      }
 
       await fetchPortfolio(); // Refresh the portfolio
       toast({

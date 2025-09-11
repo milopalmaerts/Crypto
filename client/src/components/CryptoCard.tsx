@@ -7,16 +7,11 @@ import { Link } from "react-router-dom";
 
 export interface CryptoHolding {
   id: string;
-  user_id: string;
-  crypto_id: string;
   symbol: string;
   name: string;
   amount: number;
-  avg_price: number;
+  avgPrice: number;
   currentPrice?: number; // Added at runtime for display
-  created_at: string;
-  updated_at: string;
-  icon?: string;
 }
 
 interface CryptoCardProps {
@@ -25,9 +20,9 @@ interface CryptoCardProps {
 }
 
 export const CryptoCard = ({ crypto, className }: CryptoCardProps) => {
-  const currentPrice = crypto.currentPrice || crypto.avg_price;
+  const currentPrice = crypto.currentPrice || crypto.avgPrice;
   const totalValue = crypto.amount * currentPrice;
-  const totalCost = crypto.amount * crypto.avg_price;
+  const totalCost = crypto.amount * crypto.avgPrice;
   const profitLoss = totalValue - totalCost;
   const profitLossPercentage = ((profitLoss / totalCost) * 100);
   const isProfit = profitLoss >= 0;
@@ -36,7 +31,7 @@ export const CryptoCard = ({ crypto, className }: CryptoCardProps) => {
   // Chart data is only needed in the CoinDetail page, not in the card overview
 
   return (
-    <Link to={`/coin/${crypto.crypto_id}`}>
+    <Link to={`/coin/${crypto.id}`}>
       <Card className={cn("bg-gradient-card border-border/50 shadow-card hover:shadow-neon/20 transition-all duration-300 cursor-pointer", className)}>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
@@ -79,7 +74,7 @@ export const CryptoCard = ({ crypto, className }: CryptoCardProps) => {
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Avg Price</p>
-              <p className="text-sm font-medium text-foreground">${crypto.avg_price.toFixed(2)}</p>
+              <p className="text-sm font-medium text-foreground">${crypto.avgPrice.toFixed(2)}</p>
             </div>
           </div>
           
