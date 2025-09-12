@@ -4,8 +4,7 @@
   "installCommand": "cd client && npm install",
   "framework": null,
   "env": {
-    "VITE_SUPABASE_URL": "https://fnggwmxkdgwxsbjekics.supabase.co",
-    "VITE_SUPABASE_ANON_KEY": "@supabase_anon_key"
+    "VITE_API_BASE_URL": "https://crypto-production-0847.up.railway.app"
   },
   "headers": [
     {

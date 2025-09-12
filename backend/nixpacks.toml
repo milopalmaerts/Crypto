@@ -2,11 +2,11 @@
 [variables]
 NODE_ENV = "production"
 
-# For monorepo: Tell Railway to build from the backend directory context
+# For backend-only deployment
 [phases.setup]
 dependsOn = []
 cmds = [
-  "echo 'Preparing backend deployment from monorepo'",
+  "echo 'Preparing backend-only deployment'",
   "echo 'Working directory: $(pwd)'",
   "echo 'Listing files: $(ls -la)'"
 ]
@@ -16,8 +16,7 @@ dependsOn = ["setup"]
 # Install only production dependencies
 cmds = [
   "npm ci --only=production --no-optional",
-  "echo 'Dependencies installed successfully'",
-  "echo 'Checking for express: $(npm list express || echo express not found)'"
+  "echo 'Dependencies installed successfully'"
 ]
 
 [phases.build]

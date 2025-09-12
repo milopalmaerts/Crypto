@@ -154,6 +154,12 @@ const corsOptions = {
       'http://127.0.0.1:3000',
       'http://localhost:5173', // Vite default
       'http://127.0.0.1:5173',
+      'http://192.168.0.131:8082', // Network IP for mobile access
+      'http://192.168.0.131:8083',
+      'http://192.168.11.1:8082', // Additional network interfaces
+      'http://192.168.11.1:8083',
+      'http://192.168.170.1:8082',
+      'http://192.168.170.1:8083',
       'https://cryptoportfolio-psi.vercel.app' // Production frontend
     ];
     

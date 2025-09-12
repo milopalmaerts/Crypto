@@ -1,3 +1,7 @@
+// DEPRECATED: This file is no longer used - migrated to Firebase
+// Keeping for reference but commented out to prevent Vite build issues
+
+/*
 import { createClient } from '@supabase/supabase-js';
 
 // Supabase configuration
@@ -94,3 +98,4 @@ export const dbHelpers = {
     }
   }
 };
+*/

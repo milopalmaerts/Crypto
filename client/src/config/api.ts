@@ -9,6 +9,14 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ||
 
 // Function to get local API URL with fallback options
 function getLocalApiUrl() {
+  // Get the current hostname/IP for mobile access
+  const hostname = window.location.hostname;
+  
+  // If accessing via network IP (mobile), use that IP for backend
+  if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+    return `http://${hostname}:3001`;
+  }
+  
   // Try multiple localhost alternatives for ERR_BLOCKED_BY_CLIENT issues
   const alternatives = [
     'http://127.0.0.1:3001',  // Numeric IP often bypasses ad blockers
