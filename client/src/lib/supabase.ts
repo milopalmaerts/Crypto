@@ -1,12 +1,8 @@
-// DEPRECATED: This file is no longer used - migrated to Firebase
-// Keeping for reference but commented out to prevent Vite build issues
-
-/*
 import { createClient } from '@supabase/supabase-js';
 
 // Supabase configuration
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://fnggwmxkdgwxsbjekics.supabase.co';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'your-anon-key-here';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZuZ2d3bXhrZGd3eHNiamVraWNzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc1Mjg1NjUsImV4cCI6MjA3MzEwNDU2NX0.EGubRmswEmLJXqysazlvhmrfRdpqNMtsla3pBV_uSgk';
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
@@ -98,4 +94,3 @@ export const dbHelpers = {
     }
   }
 };
-*/

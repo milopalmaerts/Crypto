@@ -4,7 +4,9 @@
   "installCommand": "cd client && npm install",
   "framework": null,
   "env": {
-    "VITE_API_BASE_URL": "https://crypto-production-0847.up.railway.app"
+    "VITE_API_BASE_URL": "https://crypto-production-0847.up.railway.app",
+    "VITE_SUPABASE_URL": "https://fnggwmxkdgwxsbjekics.supabase.co",
+    "VITE_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZuZ2d3bXhrZGd3eHNiamVraWNzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc1Mjg1NjUsImV4cCI6MjA3MzEwNDU2NX0.EGubRmswEmLJXqysazlvhmrfRdpqNMtsla3pBV_uSgk"
   },
   "headers": [
     {

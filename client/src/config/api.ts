@@ -17,14 +17,8 @@ function getLocalApiUrl() {
     return `http://${hostname}:3001`;
   }
   
-  // Try multiple localhost alternatives for ERR_BLOCKED_BY_CLIENT issues
-  const alternatives = [
-    'http://127.0.0.1:3001',  // Numeric IP often bypasses ad blockers
-    'http://localhost:3001',   // Standard localhost
-  ];
-  
-  // In development, try 127.0.0.1 first as it often bypasses ad blockers
-  return alternatives[0];
+  // For localhost, prefer 127.0.0.1 to avoid ad blocker issues
+  return 'http://127.0.0.1:3001';
 }
 
 export const API_ENDPOINTS = {
