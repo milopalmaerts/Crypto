@@ -3,9 +3,9 @@
   "version": "1.0.0",
   "scripts": {
     "build": "cd client && npm install && npm run build",
-    "start": "cd backend && node server.js",
+    "start": "cd backend && node server.supabase.js",
     "dev:client": "cd client && npm run dev",
-    "dev:backend": "cd backend && node server.js",
+    "dev:backend": "cd backend && node server.supabase.js",
     "install:all": "npm install && cd client && npm install && cd ../backend && npm install"
   },
   "dependencies": {
