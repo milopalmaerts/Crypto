@@ -7,8 +7,8 @@
     "npm": ">=8.0.0"
   },
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js",
+    "start": "node server.supabase.js",
+    "dev": "node server.supabase.js",
     "build": "echo 'No build step required'"
   },
   "dependencies": {

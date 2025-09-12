@@ -23,6 +23,6 @@ cmds = [
 dependsOn = ["install"]
 cmds = ["echo 'No build step required for backend'"]
 
-# Start the server directly
+# Start the Supabase server directly
 [start]
-cmd = "node server.js"
+cmd = "node server.supabase.js"

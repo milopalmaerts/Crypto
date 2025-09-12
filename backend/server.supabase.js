@@ -10,7 +10,7 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 const API_KEY = process.env.COINGECKO_API_KEY;
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this-in-production';
+const JWT_SECRET = process.env.JWT_SECRET || 'r7/LwJlBdFI4pyK8V1IPigoI4Xz2RD1imHmHui7nyy9+6pdfC5Ke+btFobPIY9Np+0KKUGXKfBCkiobn6ZroHw==';
 
 // Initialize Supabase
 const supabaseUrl = process.env.SUPABASE_URL || 'https://fnggwmxkdgwxsbjekics.supabase.co';
@@ -125,7 +125,13 @@ const getMockCoinData = (id) => {
 // Enhanced CORS configuration for development and production
 const corsOptions = {
   origin: function (origin, callback) {
-    if (!origin) return callback(null, true);
+    console.log('CORS check for origin:', origin);
+    
+    // Allow requests with no origin (mobile apps, Postman, etc.)
+    if (!origin) {
+      console.log('No origin - allowing');
+      return callback(null, true);
+    }
     
     const allowedOrigins = [
       'http://localhost:8082',
@@ -142,28 +148,34 @@ const corsOptions = {
       'http://192.168.11.1:8083',
       'http://192.168.170.1:8082',
       'http://192.168.170.1:8083',
-      'https://cryptoportfolio-psi.vercel.app'
+      'https://cryptoportfolio-psi.vercel.app' // Production frontend
     ];
     
     // Allow Railway domains
     if (origin.includes('.railway.app')) {
+      console.log('Railway domain - allowing');
       return callback(null, true);
     }
     
     // Allow Vercel domains
     if (origin.includes('.vercel.app')) {
+      console.log('Vercel domain - allowing');
       return callback(null, true);
     }
     
     if (allowedOrigins.includes(origin)) {
+      console.log('Origin in allowed list - allowing');
       return callback(null, true);
     }
     
+    console.log('Origin not allowed:', origin);
     callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  preflightContinue: false,
+  optionsSuccessStatus: 200
 };
 
 app.use(cors(corsOptions));
